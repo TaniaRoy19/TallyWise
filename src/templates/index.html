@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TallyWise — AI Finance Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #12172b;
+    --ink-soft: #4a5170;
+    --muted: #7c839c;
+    --line: #e7e9f2;
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --brand: #1e6f5c;
+    --brand-dark: #14503f;
+    --brand-light: #e3f2ec;
+    --gold: #c9973a;
+    --danger: #b5493c;
+    --danger-light: #fbeae7;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(18,23,43,0.04), 0 8px 24px -12px rgba(18,23,43,0.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 48px 24px 100px; }
+
+  /* ---------- Welcome screen ---------- */
+  #welcome-screen {
+    min-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 24px;
+    animation: welcomeIn 0.6s ease;
+    transition: opacity 0.3s ease;
+  }
+  @keyframes welcomeIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  .logo-mark {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 24px;
+    box-shadow: 0 6px 20px -6px rgba(30,111,92,0.5);
+    animation: cardIn 0.5s ease;
+  }
+  .eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--brand); background: var(--brand-light); padding: 7px 16px; border-radius: 999px;
+    margin-bottom: 22px;
+    animation: cardIn 0.5s ease 0.05s backwards;
+  }
+  #welcome-screen h1 {
+    font-size: clamp(30px, 4vw, 42px); font-weight: 800; margin: 0 0 16px; max-width: 640px;
+    letter-spacing: -0.02em; line-height: 1.15;
+    animation: cardIn 0.5s ease 0.1s backwards;
+  }
+  #welcome-screen p.desc {
+    font-size: 17px; color: var(--ink-soft); max-width: 540px; margin: 0 0 36px; line-height: 1.65;
+    animation: cardIn 0.5s ease 0.18s backwards;
+  }
+
+  .feature-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    margin-bottom: 40px; width: 100%; max-width: 720px;
+  }
+  .feature-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 14px; text-align: left;
+    opacity: 0; animation: cardIn 0.5s ease forwards;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .feature-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--brand); }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .feature-card svg { color: var(--brand); margin-bottom: 10px; }
+  .feature-card .ft-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .feature-card .ft-desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  .primary-btn {
+    background: var(--brand); color: white; border: none; padding: 17px 36px;
+    border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 16px -4px rgba(30,111,92,0.45);
+    display: inline-flex; align-items: center; gap: 10px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    font-family: inherit;
+  }
+  .primary-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px -4px rgba(30,111,92,0.55); }
+  .primary-btn:active:not(:disabled) { transform: translateY(0); box-shadow: 0 3px 12px -4px rgba(30,111,92,0.5); }
+  .primary-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .welcome-note { font-size: 13px; color: var(--muted); margin-top: 16px; opacity: 0; animation: cardIn 0.5s ease 0.4s forwards; }
+
+  /* ---------- Report screen ---------- */
+  #welcome-screen.fading-out { opacity: 0; transform: translateY(-8px); transition: opacity 0.25s ease, transform 0.25s ease; }
+  #report-screen { display: none; }
+  .fade-in { animation: fadeIn 0.45s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  header.top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 32px; flex-wrap: wrap; gap: 14px;
+  }
+  .brand-row { display: flex; align-items: center; gap: 12px; }
+  .brand-row .logo-mark-sm {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  h1.report-title { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -0.01em; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  button.secondary {
+    background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; font-family: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  button.secondary:hover { border-color: var(--brand); background: var(--brand-light); }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 22px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(18,23,43,0.05), 0 14px 32px -12px rgba(18,23,43,0.16); }
+  .card.accent::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--brand), var(--gold));
+  }
+  .card .card-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 8px; }
+  .card .num { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
+  .card .num.brand-num { color: var(--brand); }
+  .card .num.warn-num { color: var(--gold); }
+  .card .sub-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  section.panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 26px; margin-bottom: 20px; box-shadow: var(--shadow);
+  }
+  .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .panel-head svg { color: var(--brand); }
+  h2 { font-size: 14px; font-weight: 700; margin: 0; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  td.mono-cell { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; white-space: nowrap; }
+  .stage-pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    background: var(--brand-light); color: var(--brand-dark);
+  }
+  .stage-pill.llm { background: #eef1fc; color: #3d4bb8; }
+  .stage-pill.llm_fallback { background: #f1f1ee; color: var(--muted); }
+
+  .bar-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; font-size: 13px; }
+  .bar-label { width: 130px; flex-shrink: 0; font-weight: 600; }
+  .bar-track { flex: 1; background: var(--brand-light); border-radius: 6px; height: 22px; overflow: hidden; }
+  .bar-fill {
+    background: linear-gradient(90deg, var(--brand), #2b8a71); height: 100%; border-radius: 6px;
+    transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .bar-count { width: 32px; text-align: right; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+  .empty-note { color: var(--muted); font-size: 13.5px; padding: 6px 0; }
+
+  /* ---------- Q&A chat panel ---------- */
+  .qa-row { display: flex; gap: 10px; }
+  #qa-input {
+    flex: 1; padding: 13px 16px; font-size: 14px; border: 1px solid var(--line); border-radius: 10px;
+    font-family: inherit; background: var(--bg);
+  }
+  #qa-input:focus { outline: none; border-color: var(--brand); background: white; }
+  #qa-ask {
+    background: var(--brand); color: white; border: none; padding: 0 22px; border-radius: 10px;
+    font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  #qa-ask:hover { background: var(--brand-dark); }
+  #qa-answer {
+    margin-top: 16px; padding: 16px 18px; background: var(--bg); border-radius: 12px;
+    font-size: 14px; line-height: 1.6; white-space: pre-wrap; min-height: 20px; display: none;
+    border-left: 3px solid var(--brand);
+  }
+  .badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; margin-left: 8px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .badge.real { background: var(--brand); color: white; }
+  .badge.offline { background: #eaeaea; color: var(--muted); }
+  .loading-text { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+
+  .spinner {
+    width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.35); border-top-color: white;
+    border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; flex-shrink: 0;
+  }
+  .spinner.dark { border: 2.5px solid var(--brand-light); border-top-color: var(--brand); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 640px) {
+    .cards { grid-template-columns: 1fr; }
+    .feature-grid { grid-template-columns: repeat(2, 1fr); }
+    table { font-size: 12px; }
+    th, td { padding: 8px 6px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ================= WELCOME SCREEN ================= -->
+  <div id="welcome-screen">
+    <div class="logo-mark">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+    </div>
+    <div class="eyebrow">TallyWise · Razorpay Buildathon</div>
+    <h1>Never Chase a Missing Settlement Again</h1>
+    <p class="desc">
+      Drop in your ledger and settlement data. Watch exact and fuzzy matching
+      close most of it instantly — then AI reasons through the messy,
+      ambiguous leftovers so nothing gets swept under the rug.
+    </p>
+
+    <div class="feature-grid">
+      <div class="feature-card" style="animation-delay:0.05s">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <div class="ft-title">Catches the sneaky stuff</div>
+        <div class="ft-desc">Typos, delays, fees, splits</div>
+      </div>
+      <div class="feature-card" style="animation-delay:0.12s">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l7 3"/></svg>
+        <div class="ft-title">AI steps in when it's hard</div>
+        <div class="ft-desc">Never wastes a call on the easy stuff</div>
+      </div>
+      <div class="feature-card" style="animation-delay:0.19s">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L14.7 3.86a2 2 0 0 0-3.4 0Z"/></svg>
+        <div class="ft-title">Never fails silently</div>
+        <div class="ft-desc">Every miss comes with a reason</div>
+      </div>
+      <div class="feature-card" style="animation-delay:0.26s">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <div class="ft-title">Interrogate any order</div>
+        <div class="ft-desc">Ask it anything, live</div>
+      </div>
+    </div>
+
+    <button id="generate-btn" class="primary-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 3 14 9-14 9V3z"/></svg>
+      Run Reconciliation
+    </button>
+    <div class="welcome-note" id="welcome-note">60+ row live batch · results in seconds</div>
+  </div>
+
+  <!-- ================= REPORT SCREEN ================= -->
+  <div id="report-screen">
+    <header class="top-bar">
+      <div class="brand-row">
+        <div class="logo-mark-sm">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        </div>
+        <div>
+          <h1 class="report-title">TallyWise</h1>
+          <div class="subtitle">AI Finance Controller · ledger vs. gateway settlement</div>
+        </div>
+      </div>
+      <button id="regenerate-btn" class="secondary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        Regenerate
+      </button>
+    </header>
+
+    <div id="content"></div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        <h2>Ask about a specific order or settlement</h2>
+      </div>
+      <div class="qa-row">
+        <input id="qa-input" type="text" placeholder="e.g. why wasn't ORD1005 settled?">
+        <button id="qa-ask">Ask</button>
+      </div>
+      <div id="qa-answer"></div>
+    </section>
+  </div>
+
+</div>
+
+<script>
+async function generateReport(button, noteEl) {
+  button.disabled = true;
+  const originalHTML = button.innerHTML;
+  button.innerHTML = '<span class="spinner' + (button.id === 'regenerate-btn' ? ' dark' : '') + '"></span>Generating…';
+  if (noteEl) noteEl.textContent = 'Running exact match → fuzzy match → AI resolution…';
+
+  try {
+    const runRes = await fetch('/api/run', { method: 'POST' });
+    if (!runRes.ok) throw new Error('Pipeline run failed');
+    const reportRes = await fetch('/api/report');
+    const report = await reportRes.json();
+    renderReport(report);
+
+    const welcomeEl = document.getElementById('welcome-screen');
+    const reportEl = document.getElementById('report-screen');
+    welcomeEl.classList.add('fading-out');
+    setTimeout(() => {
+      welcomeEl.style.display = 'none';
+      reportEl.style.display = 'block';
+      reportEl.classList.add('fade-in');
+    }, 250);
+  } catch (err) {
+    if (noteEl) noteEl.textContent = 'Something went wrong: ' + err.message;
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalHTML;
+  }
+}
+
+function animateNumber(el, targetText) {
+  // Extracts the numeric part and animates it; keeps any suffix (%, /60) intact.
+  const match = targetText.match(/^([\d.]+)(.*)$/);
+  if (!match) { el.textContent = targetText; return; }
+  const target = parseFloat(match[1]);
+  const suffix = match[2];
+  const decimals = (match[1].split('.')[1] || '').length;
+  let frame = 0;
+  const totalFrames = 30;
+  const step = () => {
+    frame++;
+    const progress = 1 - Math.pow(1 - frame / totalFrames, 3);
+    const current = (target * progress).toFixed(decimals);
+    el.textContent = current + suffix;
+    if (frame < totalFrames) requestAnimationFrame(step);
+    else el.textContent = targetText;
+  };
+  requestAnimationFrame(step);
+}
+
+function renderReport(report) {
+  const s = report.summary;
+  const content = document.getElementById('content');
+
+  content.style.opacity = '0';
+  content.style.transition = 'opacity 0.2s ease';
+
+  const maxCount = Math.max(...Object.values(s.matches_by_stage), 1);
+  const bars = Object.entries(s.matches_by_stage)
+    .sort((a, b) => b[1] - a[1])
+    .map(([stage, count]) => `
+      <div class="bar-row">
+        <div class="bar-label">${stage}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:0%" data-target="${count / maxCount * 100}"></div></div>
+        <div class="bar-count">${count}</div>
+      </div>`).join('');
+
+  const exceptionRows = report.unresolved_ledger.length
+    ? report.unresolved_ledger.map(u => `<tr><td class="mono-cell">${u.ledger_id}</td><td>${u.reason}</td></tr>`).join('')
+    : `<tr><td colspan="2"><div class="empty-note">None — every ledger row was resolved.</div></td></tr>`;
+
+  const sampleRows = report.matches.slice(0, 15).map(m => `
+    <tr>
+      <td class="mono-cell">${m.ledger_ids.join(', ')}</td>
+      <td class="mono-cell">${m.gateway_ids.join(', ')}</td>
+      <td><span class="stage-pill ${m.stage}">${m.stage}</span></td>
+      <td class="mono-cell">${m.confidence}</td>
+      <td>${m.reason}</td>
+    </tr>`).join('');
+
+  content.innerHTML = `
+    <div class="cards">
+      <div class="card accent">
+        <div class="card-label">Match rate</div>
+        <div class="num brand-num" id="stat-rate">0%</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Ledger rows matched</div>
+        <div class="num" id="stat-matched">0/${s.total_ledger_rows}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Unresolved</div>
+        <div class="num warn-num" id="stat-unresolved">0</div>
+        <div class="sub-label">out of ${s.total_ledger_rows} total</div>
+      </div>
+    </div>
+    <section class="panel">
+      <div class="panel-head">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg>
+        <h2>Matches by stage</h2>
+      </div>
+      ${bars}
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L14.7 3.86a2 2 0 0 0-3.4 0Z"/></svg>
+        <h2>Unresolved / exceptions</h2>
+      </div>
+      <table><thead><tr><th>Ledger ID</th><th>Reason</th></tr></thead><tbody>${exceptionRows}</tbody></table>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <h2>Sample resolved matches</h2>
+      </div>
+      <table><thead><tr><th>Ledger</th><th>Gateway</th><th>Stage</th><th>Confidence</th><th>Reason</th></tr></thead><tbody>${sampleRows}</tbody></table>
+    </section>
+  `;
+
+  // Animate the headline numbers + bars after paint
+  requestAnimationFrame(() => {
+    content.style.opacity = '1';
+    animateNumber(document.getElementById('stat-rate'), s.match_rate_pct + '%');
+    animateNumber(document.getElementById('stat-matched'), s.matched_ledger_rows + '/' + s.total_ledger_rows);
+    animateNumber(document.getElementById('stat-unresolved'), String(s.unresolved_ledger_count));
+    document.querySelectorAll('.bar-fill').forEach(el => {
+      el.style.width = el.dataset.target + '%';
+    });
+  });
+}
+
+document.getElementById('generate-btn').addEventListener('click', () => {
+  generateReport(document.getElementById('generate-btn'), document.getElementById('welcome-note'));
+});
+
+document.getElementById('regenerate-btn').addEventListener('click', () => {
+  generateReport(document.getElementById('regenerate-btn'), null);
+});
+
+document.getElementById('qa-ask').addEventListener('click', async (evt) => {
+  const askBtn = evt.currentTarget;
+  if (askBtn.disabled) return;  // guard against double-fire
+  askBtn.disabled = true;
+
+  const input = document.getElementById('qa-input');
+  const answerBox = document.getElementById('qa-answer');
+  const question = input.value.trim();
+  if (!question) { askBtn.disabled = false; return; }
+
+  answerBox.style.display = 'block';
+  answerBox.innerHTML = '<span class="loading-text"><span class="spinner dark"></span>Thinking…</span>';
+
+  try {
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      answerBox.textContent = data.error;
+    } else {
+      answerBox.innerHTML = data.answer.replace(/\n/g, '<br>');
+    }
+  } finally {
+    askBtn.disabled = false;
+  }
+});
+
+document.getElementById('qa-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('qa-ask').click();
+});
+</script>
+
+</body>
+</html>

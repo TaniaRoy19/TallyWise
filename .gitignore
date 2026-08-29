@@ -1,0 +1,7 @@
+data/*.csv
+output/*.json
+output/*.md
+__pycache__/
+*.pyc
+.env
+.venv/
