@@ -7,10 +7,14 @@ Discrepancies are injected on purpose so the reconciliation engine has
 real work to do:
   - reference ID typos / case differences
   - date drift (settlement lags order by 1-3 days)
-  - amount mismatches (partial refunds, gateway fee deduction)
+  - amount mismatches: gateway fee deduction (small, 1.5-3%) vs. partial
+    refunds (larger, 15-45% -- a genuinely different real-world story)
   - split settlements (one order settled in two rows)
   - duplicate rows
   - orphan rows (present in only one source)
+  - compound cases: some rows carry two problems at once (e.g. a typo'd
+    reference AND a settlement delay together), since real messy data
+    rarely varies just one field in isolation
 """
 
 import csv
@@ -58,8 +62,9 @@ def main():
         # decide what kind of case this record becomes
         case = random.choices(
             ["clean", "typo_ref", "date_drift", "fee_deducted",
-             "split_settlement", "duplicate", "ledger_only", "gateway_only"],
-            weights=[38, 12, 12, 12, 8, 6, 6, 6],
+             "split_settlement", "duplicate", "ledger_only", "gateway_only",
+             "partial_refund", "typo_and_drift"],
+            weights=[30, 10, 10, 10, 8, 6, 6, 6, 8, 6],
         )[0]
 
         ledger_rows.append({
@@ -142,6 +147,34 @@ def main():
                 "reference": ref,
                 "amount": amount,
                 "date": order_date.strftime("%Y-%m-%d"),
+                "merchant": merchant,
+            })
+
+        elif case == "partial_refund":
+            # A meaningfully larger gap than a gateway fee -- the customer
+            # was partially refunded before settlement was recorded, so the
+            # settled amount is genuinely, substantially less than the order.
+            # This deliberately falls outside the fuzzy_fee tolerance band,
+            # so it's a real (not contrived) case for the AI resolution stage.
+            refund_pct = random.uniform(0.15, 0.45)
+            gateway_rows.append({
+                "settlement_id": f"STL{2000+i}",
+                "reference": ref,
+                "amount": round(amount * (1 - refund_pct), 2),
+                "date": (order_date + timedelta(days=random.randint(1, 4))).strftime("%Y-%m-%d"),
+                "merchant": merchant,
+            })
+
+        elif case == "typo_and_drift":
+            # Compound, realistic messiness: a typo'd reference AND a
+            # settlement delay on the same row, instead of one isolated
+            # variable at a time.
+            drift = timedelta(days=random.randint(2, 4))
+            gateway_rows.append({
+                "settlement_id": f"STL{2000+i}",
+                "reference": typo(ref),
+                "amount": amount,
+                "date": (order_date + drift).strftime("%Y-%m-%d"),
                 "merchant": merchant,
             })
 

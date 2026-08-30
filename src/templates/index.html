@@ -163,6 +163,14 @@
   }
   .stage-pill.llm { background: #eef1fc; color: #3d4bb8; }
   .stage-pill.llm_fallback { background: #f1f1ee; color: var(--muted); }
+  .cause-pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    white-space: nowrap;
+  }
+  .cause-pill.missing_settlement { background: var(--danger-light); color: var(--danger); }
+  .cause-pill.data_entry_error { background: #fdf3e3; color: #96660f; }
+  .cause-pill.ambiguous_duplicate { background: #eef1fc; color: #3d4bb8; }
+  .cause-pill.other { background: #f1f1ee; color: var(--muted); }
 
   .bar-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; font-size: 13px; }
   .bar-label { width: 130px; flex-shrink: 0; font-weight: 600; }
@@ -362,8 +370,8 @@ function renderReport(report) {
       </div>`).join('');
 
   const exceptionRows = report.unresolved_ledger.length
-    ? report.unresolved_ledger.map(u => `<tr><td class="mono-cell">${u.ledger_id}</td><td>${u.reason}</td></tr>`).join('')
-    : `<tr><td colspan="2"><div class="empty-note">None — every ledger row was resolved.</div></td></tr>`;
+    ? report.unresolved_ledger.map(u => `<tr><td class="mono-cell">${u.ledger_id}</td><td><span class="cause-pill ${u.likely_cause || 'other'}">${u.likely_cause_label || 'Unclear cause'}</span></td><td>${u.reason}</td></tr>`).join('')
+    : `<tr><td colspan="3"><div class="empty-note">None — every ledger row was resolved.</div></td></tr>`;
 
   const sampleRows = report.matches.slice(0, 15).map(m => `
     <tr>
@@ -402,7 +410,7 @@ function renderReport(report) {
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L14.7 3.86a2 2 0 0 0-3.4 0Z"/></svg>
         <h2>Unresolved / exceptions</h2>
       </div>
-      <table><thead><tr><th>Ledger ID</th><th>Reason</th></tr></thead><tbody>${exceptionRows}</tbody></table>
+      <table><thead><tr><th>Ledger ID</th><th>Likely cause</th><th>Reason</th></tr></thead><tbody>${exceptionRows}</tbody></table>
     </section>
     <section class="panel">
       <div class="panel-head">

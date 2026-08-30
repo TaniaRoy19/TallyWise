@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 import csv
 import json
 import os
@@ -53,6 +55,11 @@ def main():
     for m in all_matches:
         stage_counts[m["stage"]] = stage_counts.get(m["stage"], 0) + 1
 
+    cause_counts = {}
+    for u in still_unresolved_ledger:
+        c = u.get("likely_cause_label", "Unclear cause")
+        cause_counts[c] = cause_counts.get(c, 0) + 1
+
     result = {
         "summary": {
             "total_ledger_rows": total_ledger,
@@ -62,6 +69,7 @@ def main():
             "matches_by_stage": stage_counts,
             "unresolved_ledger_count": len(still_unresolved_ledger),
             "unresolved_gateway_count": len(still_unresolved_gateway),
+            "unresolved_by_cause": cause_counts,
         },
         "matches": all_matches,
         "unresolved_ledger": still_unresolved_ledger,
@@ -93,13 +101,18 @@ def write_markdown_report(result):
     lines.append("")
     lines.append(f"## Unresolved ({s['unresolved_ledger_count']} ledger rows, "
                   f"{s['unresolved_gateway_count']} gateway rows)\n")
+    if s.get("unresolved_by_cause"):
+        lines.append("**By likely cause:**\n")
+        for cause, count in sorted(s["unresolved_by_cause"].items(), key=lambda x: -x[1]):
+            lines.append(f"- {cause}: {count}")
+        lines.append("")
     if result["unresolved_ledger"]:
-        lines.append("| Ledger ID | Reason the system could not resolve it |")
-        lines.append("|---|---|")
+        lines.append("| Ledger ID | Likely cause | Reason the system could not resolve it |")
+        lines.append("|---|---|---|")
         for u in result["unresolved_ledger"]:
-            lines.append(f"| {u['ledger_id']} | {u['reason']} |")
+            lines.append(f"| {u['ledger_id']} | {u.get('likely_cause_label', 'Unclear cause')} | {u['reason']} |")
     else:
-        lines.append("_None — every ledger row was resolved._")
+        lines.append("_None \u2014 every ledger row was resolved._")
     lines.append("")
     lines.append("## Sample resolved matches (with reasoning)\n")
     lines.append("| Ledger | Gateway | Stage | Confidence | Reason |")
