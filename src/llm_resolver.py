@@ -23,9 +23,11 @@ GOOGLE_API_KEY. Falls back to a deterministic heuristic if no key is set.
 
 import json
 import os
+import time
 
-GEMINI_MODEL = "gemini-3.5-flash-lite"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite"
+GEMINI_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 # Valid values for "likely_cause" when a row can't be resolved -- lets a
 # human reviewer see at a glance what kind of follow-up each exception
@@ -65,9 +67,42 @@ likely_cause:
 """
 
 
-def _call_llm(ledger_row, candidates):
+def _try_model(model, api_key, body, attempts=3):
+    """Attempts a single model up to `attempts` times. Returns parsed JSON
+    on success, or None if every attempt fails."""
     import urllib.request
 
+    url = GEMINI_URL_TEMPLATE.format(model=model)
+    last_error = None
+    for attempt in range(attempts):
+        req = urllib.request.Request(
+            f"{url}?key={api_key}",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read())
+            parts = data["candidates"][0]["content"]["parts"]
+            text = "".join(p.get("text", "") for p in parts)
+            text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1:
+                text = text[start:end + 1]
+            return json.loads(text)
+        except Exception as e:
+            last_error = e
+            if attempt < attempts - 1:
+                print(f"  [llm_resolver] {model}: attempt {attempt + 1} failed ({e}), retrying...")
+                time.sleep(1)
+            continue
+
+    print(f"  [llm_resolver] {model}: all {attempts} attempts failed, last error: {last_error}")
+    return None
+
+
+def _call_llm(ledger_row, candidates):
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         return None  # caller falls back to heuristic
@@ -83,34 +118,23 @@ def _call_llm(ledger_row, candidates):
         "generationConfig": {"temperature": 0, "maxOutputTokens": 1024},
     }).encode()
 
-    # Retry once on a slow/failed call before giving up -- a single timeout
-    # shouldn't immediately concede to the offline fallback when the API is
-    # just having a momentarily slow response.
-    last_error = None
-    for attempt in range(2):
-        req = urllib.request.Request(
-            f"{GEMINI_URL}?key={api_key}",
-            data=body,
-            headers={"Content-Type": "application/json"},
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=45) as resp:
-                data = json.loads(resp.read())
-            parts = data["candidates"][0]["content"]["parts"]
-            text = "".join(p.get("text", "") for p in parts)
-            text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-            start = text.find("{")
-            end = text.rfind("}")
-            if start != -1 and end != -1:
-                text = text[start:end + 1]
-            return json.loads(text)
-        except Exception as e:
-            last_error = e
-            if attempt == 0:
-                print(f"  [llm_resolver] Attempt 1 failed ({e}), retrying once...")
-            continue
+    # Try the primary model first (2 attempts, moderate timeout -- fast
+    # enough that a genuinely slow/failing call doesn't eat minutes).
+    result = _try_model(GEMINI_MODEL, api_key, body, attempts=2)
+    if result is not None:
+        return result
 
-    print(f"  [llm_resolver] API call failed after retry, falling back to heuristic: {last_error}")
+    # If the primary model is having a rough moment, try a different
+    # model once as a last resort -- a separate model is a separate
+    # capacity pool on Google's side, so it may succeed even when the
+    # primary one is struggling. Only one attempt here to keep total
+    # worst-case time bounded.
+    print(f"  [llm_resolver] Primary model exhausted, trying fallback model {GEMINI_FALLBACK_MODEL}...")
+    result = _try_model(GEMINI_FALLBACK_MODEL, api_key, body, attempts=1)
+    if result is not None:
+        return result
+
+    print("  [llm_resolver] Both models failed, falling back to heuristic.")
     return None
 
 
@@ -146,11 +170,27 @@ def resolve_unresolved(ledger_pool, gateway_pool, unresolved_ledger_ids, unresol
     unresolved gateway rows from the same merchant.
     Returns (new_matches: list[dict], still_unresolved_ledger, still_unresolved_gateway)
     """
+    import time
+
     still_unresolved_gateway = set(unresolved_gateway_ids)
     new_matches = []
     still_unresolved_ledger = []
+    has_api_key = bool(os.environ.get("GOOGLE_API_KEY"))
 
-    for lid in unresolved_ledger_ids:
+    for i, lid in enumerate(unresolved_ledger_ids):
+        # Pace our own requests well under the free-tier rate limit (15/min
+        # for gemini-3.5-flash-lite), so we don't trigger Google's own
+        # throttling ourselves -- especially with the retry logic above,
+        # which can otherwise double our request rate in a short window.
+        # Real usage data showed we were hitting 13/15 RPM during a batch
+        # run, so this gap is wide enough to keep us comfortably under
+        # the ceiling even if several calls need their retry.
+        # Only relevant when we're actually making live API calls --
+        # skip entirely in offline mode, where there's no rate limit to
+        # worry about at all.
+        if i > 0 and has_api_key:
+            time.sleep(2)
+
         lrow = ledger_pool[lid]
         candidates = [
             {**gateway_pool[gid], "settlement_id": gid}

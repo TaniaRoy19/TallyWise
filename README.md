@@ -23,7 +23,10 @@ It falls back to a deterministic offline mode for AI resolution and Q&A.
 # create a .env file in the project root with:
 GOOGLE_API_KEY=your-gemini-key-here
 ```
-Get one free at [aistudio.google.com](https://aistudio.google.com) — no billing required. We use `gemini-3.5-flash-lite`, chosen specifically after testing showed it has a workable free-tier quota (15 requests/min).
+Get one free at **aistudio.google.com** — no billing required. 
+We use **gemini-3.1-flash-lite as the primary model**, with **gemini-3.5-flash-lite as an automatic fallback** if the primary is briefly unavailable,
+chosen after testing real free-tier quotas directly, since some Gemini model variants have quotas too small to be usable at all.
+If both models fail (e.g. a temporary outage), **the system falls back to a deterministic offline heuristic rather than crashing.**
 
 
 **Prefer the command line instead of the web app?**
@@ -118,7 +121,6 @@ Every unresolved case gets sorted into one of three buckets, so a human knows ex
 
 ## How it's built
 
-```
    Ledger + settlement CSVs
             │
             ▼
@@ -128,15 +130,17 @@ Every unresolved case gets sorted into one of three buckets, so a human knows ex
    Fuzzy match (Stage 2) ── typos, delays, fees, splits
             │  leftovers only
             ▼
-   AI resolution (Stage 3) ── Gemini reasons over a narrow, specific
-            │                  candidate set — never the whole dataset
-            ▼
+   AI resolution (Stage 3) ── Gemini reasons over a narrow, specific  candidate set  
+            │                 (tries a 2nd model as
+            |                 backup if the 1st is unavailable)
+            |                                                
+            ▼                   
+
    Report: match rate + reasoned breakdown + categorized exceptions
             │
       ┌─────┴─────┐
       ▼           ▼
  Terminal Q&A   Web dashboard + Q&A
-```
 
 **Why rules-first, AI-last?** Cheap, predictable patterns don't need an LLM — that would be slower, more expensive, and harder to audit for no real benefit. AI only touches the narrow slice of cases that genuinely need judgment, and every decision it makes — match or decline — comes with a stated, checkable reason. Nothing is a black box.
 

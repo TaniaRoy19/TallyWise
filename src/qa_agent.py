@@ -20,13 +20,15 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT, "data")
 OUTPUT_DIR = os.path.join(ROOT, "output")
-GEMINI_MODEL = "gemini-3.6-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite"
+GEMINI_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 ID_PATTERN = re.compile(r"\b(ORD\d+|STL\d+[A-Za-z\-]*)\b", re.IGNORECASE)
 
@@ -107,6 +109,33 @@ def build_context(question, ledger, gateway, report):
     return context, ids
 
 
+def _try_model(model, api_key, body, attempts=3):
+    """Attempts a single model up to `attempts` times. Returns the answer
+    text on success, or None if every attempt fails."""
+    url = GEMINI_URL_TEMPLATE.format(model=model)
+    last_error = None
+    for attempt in range(attempts):
+        req = urllib.request.Request(
+            f"{url}?key={api_key}",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read())
+            parts = data["candidates"][0]["content"]["parts"]
+            return "".join(p.get("text", "") for p in parts).strip()
+        except Exception as e:
+            last_error = e
+            if attempt < attempts - 1:
+                print(f"  [qa_agent] {model}: attempt {attempt + 1} failed ({e}), retrying...")
+                time.sleep(1)
+            continue
+
+    print(f"  [qa_agent] {model}: all {attempts} attempts failed, last error: {last_error}")
+    return None
+
+
 def _call_llm(question, context):
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
@@ -120,26 +149,16 @@ def _call_llm(question, context):
         "generationConfig": {"temperature": 0, "maxOutputTokens": 1024},
     }).encode()
 
-    # Retry once on a slow/failed call before giving up.
-    last_error = None
-    for attempt in range(2):
-        req = urllib.request.Request(
-            f"{GEMINI_URL}?key={api_key}",
-            data=body,
-            headers={"Content-Type": "application/json"},
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=45) as resp:
-                data = json.loads(resp.read())
-            parts = data["candidates"][0]["content"]["parts"]
-            return "".join(p.get("text", "") for p in parts).strip()
-        except Exception as e:
-            last_error = e
-            if attempt == 0:
-                print(f"  [qa_agent] Attempt 1 failed ({e}), retrying once...")
-            continue
+    answer = _try_model(GEMINI_MODEL, api_key, body, attempts=2)
+    if answer is not None:
+        return answer
 
-    print(f"  [qa_agent] API call failed after retry, falling back to templated answer: {last_error}")
+    print(f"  [qa_agent] Primary model exhausted, trying fallback model {GEMINI_FALLBACK_MODEL}...")
+    answer = _try_model(GEMINI_FALLBACK_MODEL, api_key, body, attempts=1)
+    if answer is not None:
+        return answer
+
+    print("  [qa_agent] Both models failed, falling back to templated answer.")
     return None
 
 
