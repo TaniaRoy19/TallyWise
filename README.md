@@ -1,6 +1,6 @@
 # TallyWise
 
-**An AI agent that reconciles your payment records and lets you ask it anything about them, on demand.**
+**An AI agent that reconciles your payment records and doubles as a Q&A agent for all payment-related questions.**
 
 Built for the Razorpay Buildathon (Track 04: AI Finance Controller).
 
@@ -72,27 +72,23 @@ about what it doesn't know.
 
 We didn't just make a CSV matcher — we deliberately built in the messy stuff real finance teams actually deal with:
 
-| What's messy        | Example |
-|---------------------|---------|
-| Typos               | A reference number gets one character swapped |
-
-| Delays              | Settlement arrives 1-3 days after the order |
-
-| Fees                | Gateway takes a small cut before settling |
-
-| Split payments      | One order gets paid out in two separate transfers |
-
-| **Partial refunds** | Customer gets refunded before settlement — the amounts are   meaningfully different, not just off by a rounding error |
-
-| **Compound errors** | A typo AND a delay on the same row, because real bad data rarely breaks one thing at a time |
+| What's messy        | Example                                                                                             |
+|---------------------|-----------------------------------------------------------------------------------------------------|
+| Typos               | A reference number gets one character swapped                                                       |
+| Delays              | Settlement arrives 1-3 days after the order                                                         |
+| Fees                | Gateway takes a small cut before settling                                                           |
+| Split payments      | One order gets paid out in two separate transfers                                                   |
+| **Partial refunds** | Customer gets refunded before settlement — the amounts are   meaningfully different, not just off by                         a rounding error                                                                                    | **Compound errors** | A typo AND a delay on the same row, because real bad data rarely breaks one thing at a time         |
 
 The last two are the ones that actually need AI — they're not solvable with simple rules, and that's on purpose.
 
 ## The results
 
-| | Rules alone | With AI |
-|---|---|---|
-| **Default run** | 80.0% | **83.3%** |
+ **Default run**
+
+|Rules alone | With AI |
+|------------|---------|
+|  80.0%     |**85.0%**|
 
 We didn't stop at one lucky number. We tested this across 4 different random datasets to make sure it holds up:
 
