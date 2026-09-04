@@ -83,25 +83,35 @@ def _call_llm(ledger_row, candidates):
         "generationConfig": {"temperature": 0, "maxOutputTokens": 1024},
     }).encode()
 
-    req = urllib.request.Request(
-        f"{GEMINI_URL}?key={api_key}",
-        data=body,
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-        parts = data["candidates"][0]["content"]["parts"]
-        text = "".join(p.get("text", "") for p in parts)
-        text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end != -1:
-            text = text[start:end + 1]
-        return json.loads(text)
-    except Exception as e:
-        print(f"  [llm_resolver] API call failed, falling back to heuristic: {e}")
-        return None
+    # Retry once on a slow/failed call before giving up -- a single timeout
+    # shouldn't immediately concede to the offline fallback when the API is
+    # just having a momentarily slow response.
+    last_error = None
+    for attempt in range(2):
+        req = urllib.request.Request(
+            f"{GEMINI_URL}?key={api_key}",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read())
+            parts = data["candidates"][0]["content"]["parts"]
+            text = "".join(p.get("text", "") for p in parts)
+            text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1:
+                text = text[start:end + 1]
+            return json.loads(text)
+        except Exception as e:
+            last_error = e
+            if attempt == 0:
+                print(f"  [llm_resolver] Attempt 1 failed ({e}), retrying once...")
+            continue
+
+    print(f"  [llm_resolver] API call failed after retry, falling back to heuristic: {last_error}")
+    return None
 
 
 def _heuristic_fallback(ledger_row, candidates):

@@ -1,5 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv()
 """
 Settlement Q&A agent.
 
@@ -27,7 +25,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT, "data")
 OUTPUT_DIR = os.path.join(ROOT, "output")
-GEMINI_MODEL = "gemini-3.5-flash-lite"
+GEMINI_MODEL = "gemini-3.6-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 ID_PATTERN = re.compile(r"\b(ORD\d+|STL\d+[A-Za-z\-]*)\b", re.IGNORECASE)
@@ -122,19 +120,27 @@ def _call_llm(question, context):
         "generationConfig": {"temperature": 0, "maxOutputTokens": 1024},
     }).encode()
 
-    req = urllib.request.Request(
-        f"{GEMINI_URL}?key={api_key}",
-        data=body,
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-        parts = data["candidates"][0]["content"]["parts"]
-        return "".join(p.get("text", "") for p in parts).strip()
-    except Exception as e:
-        print(f"  [qa_agent] API call failed, falling back to templated answer: {e}")
-        return None
+    # Retry once on a slow/failed call before giving up.
+    last_error = None
+    for attempt in range(2):
+        req = urllib.request.Request(
+            f"{GEMINI_URL}?key={api_key}",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read())
+            parts = data["candidates"][0]["content"]["parts"]
+            return "".join(p.get("text", "") for p in parts).strip()
+        except Exception as e:
+            last_error = e
+            if attempt == 0:
+                print(f"  [qa_agent] Attempt 1 failed ({e}), retrying once...")
+            continue
+
+    print(f"  [qa_agent] API call failed after retry, falling back to templated answer: {last_error}")
+    return None
 
 
 def _templated_fallback(question, context, ids):
