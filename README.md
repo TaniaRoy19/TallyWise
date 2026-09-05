@@ -117,6 +117,10 @@ Every unresolved case gets sorted into one of three buckets, so a human knows ex
 
 ## How it's built
 
+
+<img width="314" height="470" alt="image" src="https://github.com/user-attachments/assets/737b37eb-3711-4f4f-9196-2c897d71dad8" />
+
+
    Ledger + settlement CSVs
             │
             ▼
